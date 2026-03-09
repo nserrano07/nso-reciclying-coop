@@ -1,0 +1,65 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+
+# Load data
+@st.cache_data
+def load_data():
+    return pd.read_csv("mock_waste_report_data_v2.csv", parse_dates=["report_date"])
+
+df = load_data()
+
+st.title("🗑️ Recycling Report Dashboard")
+st.markdown("Monitor waste reporting and recycling flows across Colombian cities")
+
+# Filters
+city = st.selectbox("Select a city", options=["All"] + sorted(df["location"].unique().tolist()))
+collector = st.selectbox("Select collector type", options=["All"] + sorted(df["collector_type"].unique().tolist()))
+status = st.multiselect("Recycling status", options=df["recycling_status"].unique(), default=df["recycling_status"].unique())
+
+# Apply filters
+filtered_df = df.copy()
+if city != "All":
+    filtered_df = filtered_df[filtered_df["location"] == city]
+if collector != "All":
+    filtered_df = filtered_df[filtered_df["collector_type"] == collector]
+filtered_df = filtered_df[filtered_df["recycling_status"].isin(status)]
+
+# Custom color map for recycling status
+status_colors = {
+    "Delivered": "#2E7D32",  # Green
+    "Collected": "#FFFF00",  # Yellow
+    "Reported": "#7C0A02",   # Red
+}
+
+# Charts
+st.subheader("📊 Waste Type Distribution")
+waste_fig = px.histogram(filtered_df, 
+                        x="waste_type", 
+                        color="recycling_status", 
+                        barmode="group",
+                        title="Waste type by recycling status", 
+                        labels={"waste_type": "Waste Type"},
+                        color_discrete_map=status_colors)
+st.plotly_chart(waste_fig)
+
+st.subheader("📈 Volume Over Time")
+time_fig = px.line(filtered_df.groupby("report_date")["reported_volume_kg"].sum().reset_index(),
+                   x="report_date", y="reported_volume_kg",
+                   title="Total Reported Volume Over Time",
+                   labels={"reported_volume_kg": "Reported Volume (kg)", "report_date": "Date"},
+                   color_discrete_map=status_colors)
+st.plotly_chart(time_fig)
+
+st.subheader("📍 Volume by City")
+city_fig = px.box(filtered_df, x="location", y="reported_volume_kg", color="recycling_status",
+                  title="Reported Volume by City",
+                  labels={"reported_volume_kg": "Volume (kg)", "location": "City"},
+                  color_discrete_map=status_colors)
+st.plotly_chart(city_fig)
+
+st.subheader("Summary")
+st.dataframe(filtered_df)
+
+st.markdown("---")
+st.markdown("Made for SDG 12.5.1 tracking – prototype dashboard for academic use. Copyright Natalia Serrano with support from ChatGPT, an AI language model developed by OpenAI(OpenAI, 2025).")
